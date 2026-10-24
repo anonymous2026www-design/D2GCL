@@ -1,158 +1,242 @@
-# Anonymous D2-GCL code
+ # Anonymous WWW 2027 Submission
 
-A compact implementation of D2-GCL and the GRACE baseline on **Cora,
-CiteSeer, PubMed, Cornell and Texas**. The full training method is retained; additional
-baselines, dataset adapters, parameter searches and experiment schedulers
-are not included.
+This repository contains the PyTorch implementation and experiment scripts for D2-GCL, as described in our WWW 2027 submission.
 
-## Installation
+The repository also includes the GRACE baseline and supports experiments on Cora, CiteSeer, PubMed, Cornell, and Texas.
 
-Use Python 3.10 or newer and install an appropriate PyTorch build for your
-CPU or CUDA environment, followed by:
+## Requirements
+
+Python 3.10 or later is required.
+
+### Linux/macOS
+
+Create and activate a clean virtual environment:
 
 ```bash
-pip install -r requirements.txt
+python3 -m venv .venv
+source .venv/bin/activate
 ```
 
-Run the commands below from this directory. PyG downloads each supported
-dataset on first use into `data/`. No private files or external source
-directories are required. `--device cpu` selects CPU execution.
+### Windows PowerShell
 
-## Run a fixed configuration
+Create and activate a clean virtual environment:
 
-**All parameters and fixed recipes are together in `arguments.py`.**
-There is one recipe per method and dataset; it is shared across training
-seeds. Command-line values override the recipe. No parameter search or
-label-based representation selection is performed by these commands.
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
+
+Install a PyTorch build compatible with your CPU or CUDA environment, and then install the remaining dependencies:
 
 ```bash
-python train.py --method d2gcl --dataset Cora
-python train.py --method grace --dataset Cora
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
 
-python train.py --method d2gcl --dataset CiteSeer
-python train.py --method d2gcl --dataset PubMed
-python train.py --method grace --dataset PubMed
-python train.py --method d2gcl --dataset Cornell
-python train.py --method d2gcl --dataset Texas
+To verify that PyTorch can access the GPU:
 
-# Inspect the actual settings without training.
+```bash
+python -c "import torch; print('PyTorch:', torch.__version__); print('CUDA available:', torch.cuda.is_available()); print('GPU:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'None')"
+```
+
+## Quick Start
+
+Run D2-GCL on Cora using the first CUDA GPU:
+
+```bash
+python train.py --method d2gcl --dataset Cora --device cuda:0
+```
+
+Run the GRACE baseline on Cora:
+
+```bash
+python train.py --method grace --dataset Cora --device cuda:0
+```
+
+For CPU execution:
+
+```bash
+python train.py --method d2gcl --dataset Cora --device cpu
+```
+
+Datasets are downloaded automatically on first use and stored under `data/`.
+
+## Supported Datasets
+
+The following datasets are supported:
+
+- Cora
+- CiteSeer
+- PubMed
+- Cornell
+- Texas
+
+Cora, CiteSeer, and PubMed use the public Planetoid splits. Cornell and Texas use the first predefined Geom-GCN split distributed by PyTorch Geometric.
+
+## Running Experiments
+
+### D2-GCL
+
+```bash
+python train.py --method d2gcl --dataset Cora --device cuda:0
+python train.py --method d2gcl --dataset CiteSeer --device cuda:0
+python train.py --method d2gcl --dataset PubMed --device cuda:0
+python train.py --method d2gcl --dataset Cornell --device cuda:0
+python train.py --method d2gcl --dataset Texas --device cuda:0
+```
+
+### GRACE baseline
+
+```bash
+python train.py --method grace --dataset Cora --device cuda:0
+python train.py --method grace --dataset CiteSeer --device cuda:0
+python train.py --method grace --dataset PubMed --device cuda:0
+python train.py --method grace --dataset Cornell --device cuda:0
+python train.py --method grace --dataset Texas --device cuda:0
+```
+
+## Configuration
+
+All dataset-specific configurations and fixed experimental recipes are defined in `arguments.py`.
+
+To inspect a resolved configuration without starting training:
+
+```bash
 python train.py --method d2gcl --dataset Cora --print-config
-
-# Override one setting explicitly.
-python train.py --method d2gcl --dataset Cora --lr 0.001 --q 0.5
-
-# Run the same recipe on three training seeds and aggregate the results.
-python train.py --method d2gcl --dataset Cora --seeds 0 1 2
-python train.py --method grace --dataset Cora --seeds 0 1 2
 ```
 
-The fixed D2-GCL examples are:
+Command-line arguments can be used to override individual settings:
 
-| Dataset | Learning rate | LapPE m per band | q | Candidate rule | r | K |
-|---|---:|---:|---:|---|---:|---:|
-| Cora | 0.001 | 4 | 0.50 | within r hops | 2 | 10 |
-| CiteSeer | 0.001 | 4 | 0.30 | within r hops | 1 | 5 |
-| PubMed | 0.005 | 8 | 0.30 | within r hops | 3 | 2 |
-| Cornell | 0.005 | 16 | 0.03 | all other nodes | unused | 3 |
-| Texas | 0.01 | 8 | 0.03 | all other nodes | unused | 3 |
+```bash
+python train.py \
+  --method d2gcl \
+  --dataset Cora \
+  --device cuda:0 \
+  --lr 0.001 \
+  --q 0.5
+```
 
-These commands use one fixed preset per method and dataset. No parameter
-search, seed search or result-based selection code is included.
+On Windows PowerShell, the same command can be written on one line:
 
-PubMed uses `lr=0.005`, `m=8`, `q=0.30`, `r=3`, `rho=0.5`,
-`tau=1`, `dropout=0.25`, `drop_feature=0.25`, `K=2` and
-`tau_capp=2`. All three training seeds share the same preset.
-Default seeds are 132 for Cora, 24 for CiteSeer, 173803 for PubMed,
-2045 for Cornell and 2028 for Texas. Override them with `--seed` or
-`--seeds`. See `VERIFICATION.md` for recipe provenance and measured results.
+```powershell
+python train.py --method d2gcl --dataset Cora --device cuda:0 --lr 0.001 --q 0.5
+```
 
-## D2-GCL implementation
+## Multiple Training Seeds
 
-- A two-layer feature-only MLP with BatchNorm, PReLU and dropout is trained
-  for 100 epochs by default; `rho=0.5` gives 50 epochs per phase.
-- Phase 1 uses two feature-dropped views, a projection head and symmetric
-  InfoNCE with within-view and cross-view negatives.
-- Phase 2 uses the original features and the current encoder output **H**,
-  bypassing the projection head. Semantic positives and their confidence
-  are refreshed **every epoch**. LapPE positives are fixed graph-only inputs.
-- Each criterion selects the directed top-q fraction of the candidate pool
-  (floor, with a minimum of one if the pool is nonempty). Self pairs are
-  excluded. No reciprocal-selection condition or degree cap is added.
-- Semantic and structural row-softmax confidences are averaged with equal
-  weight. Mining and confidence are detached during an optimizer step.
-  The loss is the **negative logarithm of a weighted positive sum**, not
-  the SupCon average of positive log losses. Its denominator excludes self.
-- The low LapPE band uses the smallest **positive** eigenvalues, excluding
-  all zero modes; the high band uses the largest eigenvalues. There is no
-  label-dependent preprocessing.
-- Final positives are refreshed from the final encoder output. Weighted
-  CAPP then combines hops 0 through K on the self-loop-free normalized graph,
-  using retention, positive agreement and a component-wise stationary
-  reference. Propagation never participates in contrastive optimization.
-- Empty local candidate rows are excluded from the Phase 2 loss average.
-  Their CAPP positive-agreement score falls back to self-retention. Isolated
-  nodes have zero higher-hop features, with hop 0 retained as an option.
+To run the same fixed configuration with multiple training seeds:
 
-Unless overridden by a dataset recipe, the semantic and structural confidence
-temperatures are 0.5, and the contrastive temperature, CAPP temperature
-and three CAPP coefficients are 1. All are visible in `arguments.py` and can be overridden explicitly.
+```bash
+python train.py --method d2gcl --dataset Cora --device cuda:0 --seeds 0 1 2
+```
 
-For PubMed, LapPE uses a sparse eigensolver, mined positive weights use
-sparse storage, and contrastive losses are computed in checkpointed row
-blocks. These are full-batch calculations: every node and every denominator
-candidate is retained in each update. `--chunk-size` controls a computation
-buffer, not a sampled training batch. Small graphs retain the original dense
-calculation by default. Both paths have been compared for losses, gradients,
-positive weights and complete training outputs.
+For GRACE:
 
-## Evaluation and outputs
+```bash
+python train.py --method grace --dataset Cora --device cuda:0 --seeds 0 1 2
+```
 
-The dataset's public Planetoid split is used for Cora/CiteSeer/PubMed. Cornell and Texas use
-the first predefined Geom-GCN split distributed by PyG. Splits are identical
-between methods and never regenerated from a training seed.
+The per-seed results and their aggregate mean and population standard deviation are saved automatically.
 
-Representation training receives only features and edges. Labels are used
-only by the separate frozen-representation evaluation:
+## Evaluation
 
-- Node classification: a linear classifier, 100 epochs, Adam learning rate 0.01,
-  weight decay 0.0001. The fixed final classifier epoch is reported;
-  validation accuracy is diagnostic, not a checkpoint-selection criterion.
-- Clustering: row-L2-normalized final embeddings, K equal to the number of
-  classes, ten separate K-means++ runs with initialization seeds 0 through 9,
-  `n_init=1` each, arithmetic NMI. All ten runs are retained.
-- With multiple training seeds, average each seed's ten NMI scores first,
-  then report mean and population standard deviation across training seeds.
-  Accuracy and NMI are saved as fractions in [0,1].
+The learned representations are evaluated using:
 
-For D2-GCL both tasks use the **final post-CAPP representation**. GRACE uses
-the final encoder output. The last encoder epoch is used without label-based
-checkpoint selection. The package performs no hyperparameter search; the
-fixed recipes are loaded from `arguments.py`. Recipe provenance and results
-are recorded in `VERIFICATION.md`.
+- Node classification with a frozen-representation linear classifier.
+- Node clustering with ten fixed K-means initializations.
+- Test accuracy for node classification.
+- Normalized Mutual Information (NMI) for node clustering.
 
-Outputs are under `results/<method>/<dataset>/`:
+Representation learning receives only node features and graph edges. Labels and evaluation masks are used only during the separate evaluation stage.
+
+D2-GCL is evaluated using its final post-CAPP representation. GRACE is evaluated using its final encoder representation.
+
+## Output Files
+
+Experiment outputs are stored under:
 
 ```text
-arguments.json
-per_seed.csv
-summary.csv
-seed<seed>/
-  training_loss.csv
-  metrics.json
-  checkpoint.pt
-  embedding.pt
+results/<method>/<dataset>/
 ```
 
-`metrics.json` retains all ten clustering scores. Saved embeddings also
-include the unpropagated H0 for D2-GCL. To repeat evaluation:
+The output structure is:
+
+```text
+results/
+  <method>/
+    <dataset>/
+      arguments.json
+      per_seed.csv
+      summary.csv
+      seed<seed>/
+        training_loss.csv
+        metrics.json
+        checkpoint.pt
+        embedding.pt
+```
+
+The main files are:
+
+- `arguments.json`: resolved experiment configuration.
+- `training_loss.csv`: training loss for every epoch.
+- `metrics.json`: classification and clustering results.
+- `checkpoint.pt`: trained model and linear probe parameters.
+- `embedding.pt`: final node representations.
+- `per_seed.csv`: results for individual training seeds.
+- `summary.csv`: aggregate results across training seeds.
+
+## Re-evaluating Saved Embeddings
+
+A saved representation can be evaluated again without retraining:
 
 ```bash
 python evaluate.py --embedding results/d2gcl/Cora/seed132/embedding.pt
 ```
 
-## Scope
+## Repository Structure
 
-This release provides training, linear evaluation and NMI for the five
-listed datasets. Other baselines, datasets, large-graph/mini-batch code,
-ablation sweeps, statistical comparisons and paper plotting utilities are
-outside this compact package. See `THIRD_PARTY.md` for baseline attribution.
+```text
+.
+├── arguments.py
+├── evaluate.py
+├── train.py
+├── requirements.txt
+├── README.md
+├── VERIFICATION.md
+├── THIRD_PARTY.md
+└── gcl/
+    ├── __init__.py
+    ├── data.py
+    ├── evaluation.py
+    ├── models.py
+    ├── objectives.py
+    ├── propagation.py
+    └── structure.py
+```
+
+The main components are:
+
+- `train.py`: representation training and downstream evaluation.
+- `evaluate.py`: re-evaluation of saved representations.
+- `arguments.py`: command-line arguments and fixed experiment configurations.
+- `gcl/data.py`: dataset loading and evaluation splits.
+- `gcl/models.py`: encoder and projection models.
+- `gcl/objectives.py`: contrastive objectives and positive mining.
+- `gcl/propagation.py`: confidence-aware propagation.
+- `gcl/structure.py`: structural encoding and candidate construction.
+- `gcl/evaluation.py`: node classification and clustering evaluation.
+
+## Reproducibility
+
+The repository uses one fixed configuration for each method and dataset. No hyperparameter search, seed search, or label-based representation selection is performed during the provided runs.
+
+Default training seeds and complete configurations are defined in `arguments.py`. Additional verification information and measured results are provided in `VERIFICATION.md`.
+
+## Notes
+
+- Run commands from the repository directory.
+- Relative data and output paths are resolved from the repository root.
+- An internet connection is required when a dataset is downloaded for the first time.
+- The `data/`, `results/`, virtual environment, cache, and local configuration files are excluded from Git tracking.
+- No private datasets, pretrained models, or external source directories are required.
+- Third-party baseline attribution is provided in `THIRD_PARTY.md`.
