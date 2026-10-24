@@ -1,6 +1,6 @@
-# Anonymous WWW 2026 Submission
+# Anonymous WWW 2027 Submission
 
-This repository contains the PyTorch implementation and scripts for D2-GCL, as described in our WWW 2026 submission.
+This repository contains the PyTorch implementation and scripts for D2-GCL, as described in our WWW 2027 submission.
 
 ## Requirements
 
